@@ -12,7 +12,5 @@ class LossComputer:
 
     def compute(self, logits, target):
         losses = {}
-        print(f"loss:{logits.shape}")
-        print(f"target:{target.shape}")
         losses['total_loss'] = F.cross_entropy(logits, target)
         return losses

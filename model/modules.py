@@ -68,6 +68,16 @@ class ImageNetEncoder(nn.Module):
         
         return x.flatten(start_dim=1)
 
+class Classifier(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+        self.classifier = nn.Sequential(nn.Linear(in_channels*2, in_channels*2),
+                                    nn.ReLU(),
+                                    nn.Linear(in_channels*2, 2))
+    
+    def forward(self, x):
+        
+        return self.classifier(x)
 
 if __name__ == '__main__':
     # model = FrameEncoder()

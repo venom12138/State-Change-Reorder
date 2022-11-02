@@ -40,7 +40,7 @@ def get_EPIC_parser():
     parser.add_argument('--num_workers', help='Total number of dataloader workers across all GPUs processes', type=int, default=16)
 
     parser.add_argument('--batch_size', default=8, type=int)
-    parser.add_argument('--iterations', default=5000, type=int)
+    parser.add_argument('--iterations', default=10000, type=int)
     parser.add_argument('--steps', nargs="*", default=[1000,8000], type=int)
     parser.add_argument('--lr', help='Initial learning rate', default=1e-5, type=float)
     parser.add_argument('--num_frames', default=5, type=int)

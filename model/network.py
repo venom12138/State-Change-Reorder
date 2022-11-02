@@ -14,16 +14,16 @@ class FrameReorderNet(nn.Module):
         self.config = config
         if self.config['repr_type'] == 'Clip':
             clip_model, _ = clip.load("RN50") # clip.load("ViT-L/14@336px")
-            self.Encoder = clip_model.visual # 输出是2048维的
-            self.Classifier = nn.Linear(1024*2, 2)
+            self.Encoder = clip_model.visual.to(torch.float64) # 输出是2048维的
+            self.Classifier = Classifier(1024)
         
         elif self.config['repr_type'] == 'ImageNet':
             self.Encoder = ImageNetEncoder() # 输出是2048维 
-            self.Classifier = nn.Linear(2048*2, 2)
+            self.Classifier = Classifier(2048)
             
         elif self.config['repr_type'] == 'Segmentation':
             self.Encoder = KeyEncoder() # 输出是1024维
-            self.Classifier = nn.Linear(1024*2, 2)
+            self.Classifier = Classifier(1024)
         
         elif self.config['repr_type'] == 'Action':
             raise NotImplementedError
@@ -55,7 +55,7 @@ class FrameReorderNet(nn.Module):
         if need_reshape:
             x = x.view(batch_size, num_frames, *x.shape[1:])
         
-        return x.to(self.Classifier.weight.dtype)  # [B, numframes, 2048]
+        return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 2048]
     
     # x: [B,1024*2/2048*2] 
     def classify(self, x):
