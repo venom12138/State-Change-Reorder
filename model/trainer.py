@@ -22,14 +22,16 @@ from tqdm import tqdm
 import scipy
 from scipy import stats
 
-def spearman_acc(story):
-    return scipy.stats.spearmanr(story, [0,1,2,3,4])[0]
+def spearman_acc(story, gt_order):
+    return scipy.stats.spearmanr(story, gt_order)[0]
 
-def absolute_distance(story):
-    return np.mean(np.abs(np.array(story) - np.array([0,1,2,3,4])))
+def absolute_distance(story, gt_order):
+    return np.mean(np.abs(np.array(story) - np.array(gt_order)))
 
-def pairwise_acc(story):
+def pairwise_acc(story, gt_order):
     correct = 0
+    index = np.argsort(gt_order)
+    story = list(np.array(story)[index]) # 这样gtorder就变成01234了，相当于交换了一下
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
@@ -39,10 +41,12 @@ def pairwise_acc(story):
 
 def validate(model, val_loader):
     all_scores = []
+    all_gt = []
     # Start eval
     for ti, data in tqdm(enumerate(val_loader)):  
         with torch.no_grad():
             frames = data['rgb'].cuda()
+            gt_order = data['gt_order'] # B,5
             img_features = model.encode(frames) # [B, num_frames, 2048/1024]
             scores = torch.zeros((img_features.shape[0], img_features.shape[1])).cuda() # [B, num_frames],代表了每一帧的得分
             for idx1 in range(5):
@@ -56,17 +60,20 @@ def validate(model, val_loader):
                         index = torch.argmax(logits, dim = 1) # [B]
                         scores[:,idx1] += index
             all_scores.append(scores)
+            all_gt.append(gt_order)
     
     all_scores = torch.cat(all_scores, dim = 0).cpu()
+    all_gt = torch.cat(all_gt, dim = 0).numpy()
+    print(f"gt_shape:{all_gt}")
     # print(f"all_scores: {all_scores[:10]}")
     all_scores = torch.argsort(all_scores, dim = 1).numpy()
     # print(f"all_scores: {all_scores[:10]}")
 
-    Spearman = np.mean([spearman_acc(st) for st in all_scores])
+    Spearman = np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
 
-    Absoulte_Distance = np.mean([absolute_distance(st) for st in all_scores])
+    Absoulte_Distance = np.mean([absolute_distance(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
 
-    Pairwise = np.mean([pairwise_acc(st) for st in all_scores])
+    Pairwise = np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
     
     return {'Spearman':Spearman, 
             'Absoulte_Distance':Absoulte_Distance, 
@@ -119,7 +126,7 @@ class Trainer:
         torch.set_grad_enabled(self._is_train)
         frames = data['rgb'].cuda() # [B, num_frames, 3, H, W]
         gt_order = data['gt_order'].cuda() # [B, num_frames]
-        img_features = self.model.module.encode(frames) # [B, num_frames, 2048/1024]
+        img_features = self.model.module.encode(frames) # [B, num_frames, 2048/1024/768]
         # print(f"img_features:{img_features.shape}")
         all_logits = []
         all_target = []

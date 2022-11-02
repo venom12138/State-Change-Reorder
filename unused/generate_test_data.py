@@ -19,7 +19,15 @@ for key in list(data_info.keys()):
     end_frame = data_info[key]['stop_frame']
     all_frames = list(range(start_frame, end_frame))
     selected_frames = np.random.choice(all_frames, size=5, replace=False)
-    selected_frames = list(sorted(selected_frames))
+    selected_frames = np.array(list(sorted(selected_frames)))
+    gt_order = np.array(list(range(5)))
+    
+    noise = np.random.rand(5)  # noise in [0, 1]
+    idx = np.argsort(noise)
+    # 打乱顺序
+    selected_frames = selected_frames[idx]
+    gt_order = gt_order[idx]
+    print(gt_order)
     for frame in selected_frames:
         jpg_path = os.path.join(vid_rgb_path, 'frame_' + str(frame).zfill(10) + '.jpg')
         if not os.path.exists(jpg_path):

@@ -63,7 +63,7 @@ class EPICDataset(Dataset):
             transforms.RandomGrayscale(0.05),
         ])
 
-        if repr_type == 'Clip' or repr_type == 'ImageNet':
+        if repr_type == 'Clip' or repr_type == 'ImageNet' or repr_type == 'Action':
             self.all_im_dual_transform = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomResizedCrop((224, 224), scale=(0.36,1.00), interpolation=InterpolationMode.BILINEAR)

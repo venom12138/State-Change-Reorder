@@ -43,7 +43,7 @@ class EPICtestDataset(Dataset):
         assert num_frames == 5
 
         # These set of transform is the same for im/gt pairs, but different among the 3 sampled frames
-        if repr_type == 'Clip' or repr_type == 'ImageNet':
+        if repr_type == 'Clip' or repr_type == 'ImageNet' or repr_type == 'Action':
             self.im_transform = transforms.Compose([
                 transforms.Resize((224,224), interpolation=InterpolationMode.BILINEAR),
                 transforms.ToTensor(),
@@ -64,7 +64,8 @@ class EPICtestDataset(Dataset):
         vid_im_path = path.join(self.data_root, video_value['participant_id'], 'rgb_frames', video_value['video_id'], self.vids[idx])
         
         images = []
-        gt_order = np.array(list(range(self.num_frames)))
+        # gt_order = np.array(list(range(self.num_frames)))
+        gt_order = np.argsort(selected_frames)
         
         for frame in selected_frames:
             frame_path = os.path.join(vid_im_path, frame)

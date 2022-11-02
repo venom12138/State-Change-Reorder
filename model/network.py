@@ -26,7 +26,8 @@ class FrameReorderNet(nn.Module):
             self.Classifier = Classifier(1024)
         
         elif self.config['repr_type'] == 'Action':
-            raise NotImplementedError
+            self.Encoder = VideoMae() # 输出是1024维
+            self.Classifier = Classifier(768)
         
         else:
             raise NotImplementedError
@@ -41,21 +42,28 @@ class FrameReorderNet(nn.Module):
             print('Freezing the encoder')
             for param in self.Encoder.parameters():
                 param.requires_grad = False
-                
+    # x: B, nf, 3, H, W
     def encode(self, x):
-        if len(x.shape) == 5:
-            batch_size, num_frames = x.shape[:2]
-            x = x.flatten(start_dim=0, end_dim=1) 
-            need_reshape = True
+        if self.config['repr_type'] != 'Action':
+            if len(x.shape) == 5:
+                batch_size, num_frames = x.shape[:2]
+                x = x.flatten(start_dim=0, end_dim=1) 
+                need_reshape = True
+            else:
+                need_reshape = False
+            
+            x = self.Encoder(x) 
+            
+            if need_reshape:
+                x = x.view(batch_size, num_frames, *x.shape[1:])
+            
+            return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 2048]
         else:
-            need_reshape = False
-        
-        x = self.Encoder(x) 
-        
-        if need_reshape:
-            x = x.view(batch_size, num_frames, *x.shape[1:])
-        
-        return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 2048]
+            # x: B, nf, 3, H, W
+            x = x.repeat(1,2,1,1,1)
+            # x: B, nf*2, 3, H, W
+            x = self.Encoder(x) 
+            return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 768]
     
     # x: [B,1024*2/2048*2] 
     def classify(self, x):

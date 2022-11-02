@@ -9,6 +9,23 @@ import clip
 # from cbam import CBAM
 from torchsummary import summary
 from einops import rearrange
+from decord import VideoReader, cpu
+import numpy as np
+
+from transformers import VideoMAEFeatureExtractor, VideoMAEModel
+from huggingface_hub import hf_hub_download
+
+def get_sinusoid_encoding_table(n_position, d_hid):
+    """Sinusoid position encoding table"""
+    # TODO: make it with torch instead of numpy
+    def get_position_angle_vec(position):
+        return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
+
+    sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
+    sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
+    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+
+    return torch.FloatTensor(sinusoid_table).unsqueeze(0)
 
 # Segmentation
 class KeyEncoder(nn.Module):
@@ -67,6 +84,30 @@ class ImageNetEncoder(nn.Module):
         x = self.avgpool(x) # 2048
         
         return x.flatten(start_dim=1)
+
+class VideoMae(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
+        self.model.embeddings.position_embeddings = get_sinusoid_encoding_table(14*14*5, self.model.config.hidden_size)
+        # print(f"patchsize:{self.model.encoder.patch_embed.patch_size}")
+        self.avgpool = nn.AdaptiveAvgPool2d((1,1)) # 768
+    
+    # B, numframes*2, 3, 224, 224
+    def forward(self, x):
+        B = x.shape[0]
+        num_frames = x.shape[1]//2
+        H = x.shape[-2]//16
+        W = x.shape[-1]//16
+        
+        outputs = self.model(x)
+        x = outputs.last_hidden_state # B, numframes*14*14, 768
+        
+        x = x.reshape(B, num_frames, H, W, x.shape[-1])
+        x = x.permute(0,1,4,2,3)
+        x = self.avgpool(x) # B, numframes, 768
+        
+        return x.flatten(start_dim=2) # B, numframes, 768
 
 class Classifier(nn.Module):
     def __init__(self, in_channels):
