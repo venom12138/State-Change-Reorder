@@ -14,6 +14,7 @@ from model.trainer import Trainer
 # from dataset.static_dataset import StaticTransformDataset
 # from dataset.vos_dataset import VOSDataset
 from dataset.EPIC_dataset import EPICDataset
+from dataset.EPIC_testdataset import EPICtestDataset
 from argparse import ArgumentParser
 from util.exp_handler import *
 import pathlib
@@ -23,7 +24,6 @@ from visualize.visualize_eval_result_eps import visualize_eval_result
 import wandb
 from glob import glob
 import shutil
-
 
 def get_EPIC_parser():
     parser = ArgumentParser()
@@ -145,6 +145,10 @@ train_dataset = EPICDataset(data_root=config['epic_root'], yaml_root=config['yam
                         num_frames=config['num_frames'], repr_type=config['repr_type'])
 
 train_sampler, train_loader = construct_loader(train_dataset)
+val_dataset = EPICtestDataset(data_root='./val_data', yaml_root='./val_data/EPIC100_state_positive_val.yaml', 
+                            valset_yaml_root='./val_data/reordering_val.yaml', num_frames=5, repr_type=config['repr_type'])
+
+val_loader = DataLoader(dataset=val_dataset, batch_size=7, shuffle=False, num_workers=4, pin_memory=True)
 
 # Load pertrained model if needed
 total_iter = 0
@@ -166,11 +170,15 @@ try:
         # Train loop
         model.train()
         for data in train_loader:
-            model.do_pass(data, total_iter)
+            model.do_pass(data, total_iter, val_loader)
             total_iter += 1
 
             if total_iter >= config['iterations']:
                 break
+            
+            # if total_iter % 1000 == 0 and exp is not None:
+            #     eval_metrics = validate(model.module, val_loader)
+            #     exp.write(eval_metrics, total_iter)
 finally:
     # not config['debug'] and total_iter>5000
     if model.logger is not None:

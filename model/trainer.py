@@ -18,6 +18,59 @@ from model.network import FrameReorderNet
 from model.losses import LossComputer
 import matplotlib.pyplot as plt
 from util.log_integrator import Integrator
+from tqdm import tqdm
+import scipy
+from scipy import stats
+
+def spearman_acc(story):
+    return scipy.stats.spearmanr(story, [0,1,2,3,4])[0]
+
+def absolute_distance(story):
+    return np.mean(np.abs(np.array(story) - np.array([0,1,2,3,4])))
+
+def pairwise_acc(story):
+    correct = 0
+    total = len(story) * (len(story)-1) // 2
+    for idx1 in range(len(story)):
+        for idx2 in range(idx1+1, len(story)):
+            if story[idx1] < story[idx2]:
+                correct += 1
+    return correct/total
+
+def validate(model, val_loader):
+    all_scores = []
+    # Start eval
+    for ti, data in tqdm(enumerate(val_loader)):  
+        with torch.no_grad():
+            frames = data['rgb'].cuda()
+            img_features = model.encode(frames) # [B, num_frames, 2048/1024]
+            scores = torch.zeros((img_features.shape[0], img_features.shape[1])).cuda() # [B, num_frames],代表了每一帧的得分
+            for idx1 in range(5):
+                for idx2 in range(5):
+                    if idx1 == idx2:
+                        continue
+                    else:
+                        cat_feature = torch.cat([img_features[:, idx1], img_features[:, idx2]], dim = 1)
+                        logits = model.classify(cat_feature) # [B,2] 
+                        # 【0，1】代表 idx1 > idx2
+                        index = torch.argmax(logits, dim = 1) # [B]
+                        scores[:,idx1] += index
+            all_scores.append(scores)
+    
+    all_scores = torch.cat(all_scores, dim = 0).cpu()
+    # print(f"all_scores: {all_scores[:10]}")
+    all_scores = torch.argsort(all_scores, dim = 1).numpy()
+    # print(f"all_scores: {all_scores[:10]}")
+
+    Spearman = np.mean([spearman_acc(st) for st in all_scores])
+
+    Absoulte_Distance = np.mean([absolute_distance(st) for st in all_scores])
+
+    Pairwise = np.mean([pairwise_acc(st) for st in all_scores])
+    
+    return {'Spearman':Spearman, 
+            'Absoulte_Distance':Absoulte_Distance, 
+            'Pairwise':Pairwise}
 
 class Trainer:
     def __init__(self, config, logger, local_rank, world_size):
@@ -61,7 +114,7 @@ class Trainer:
         self.log_text_interval = config['log_text_interval']
         self.save_network_interval = config['save_network_interval']
         
-    def do_pass(self, data, it):
+    def do_pass(self, data, it, val_loader):
         # No need to store the gradient outside training
         torch.set_grad_enabled(self._is_train)
         frames = data['rgb'].cuda() # [B, num_frames, 3, H, W]
@@ -93,8 +146,10 @@ class Trainer:
         if self._is_train:
             if (it) % self.log_text_interval == 0 and it != 0:
                 train_metrics = self.train_integrator.finalize()
+                
                 if self.logger is not None:
-                    self.logger.write(prefix='train', train_metrics=train_metrics, **{'lr':self.scheduler.get_last_lr()[0],
+                    eval_metrics = validate(self.model.module, val_loader)
+                    self.logger.write(prefix='reorder', train_metrics=train_metrics, eval_metrics=eval_metrics,**{'lr':self.scheduler.get_last_lr()[0],
                                     'time':(time.time()-self.last_time)/self.log_text_interval})
                     all_dicts = {**train_metrics, **{'lr':self.scheduler.get_last_lr()[0],
                                         'time':(time.time()-self.last_time)/self.log_text_interval}}
@@ -103,6 +158,11 @@ class Trainer:
                         msg = 'It {:6d} [{:5s}] [{:13}]: {:s}'.format(it, 'TRAIN', k, '{:.9s}'.format('{:0.9f}'.format(v)))
                         if self.logger is not None:
                             self.logger.log(msg)
+                    for k, v in eval_metrics.items():
+                        msg = 'It {:6d} [{:5s}] [{:13}]: {:s}'.format(it, 'EVAL', k, '{:.9s}'.format('{:0.9f}'.format(v)))
+                        if self.logger is not None:
+                            self.logger.log(msg)
+                    print('-------------------')
                 self.train_integrator.reset_except_hooks()
 
             if it % self.save_network_interval == 0 and it != 0:

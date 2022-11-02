@@ -35,10 +35,10 @@ class EPICDataset(Dataset):
         for key in list(self.data_info.keys()):
             PART = key.split('_')[0]
             VIDEO_ID = '_'.join(key.split('_')[:2])
-            vid_gt_path = os.path.join(self.data_root, PART, 'rgb_frames', VIDEO_ID, key)
+            vid_rgb_path = os.path.join(self.data_root, PART, 'rgb_frames', VIDEO_ID, key)
             # print(vid_gt_path)
             # print(glob(vid_gt_path))
-            if len(glob(f"{vid_gt_path}/*.jpg")) >= 2:
+            if len(glob(f"{vid_rgb_path}/*.jpg")) >= 2:
                 self.vids.append(key)
         
         assert repr_type in ['Clip', 'ImageNet', 'Segmentation', 'Action']
