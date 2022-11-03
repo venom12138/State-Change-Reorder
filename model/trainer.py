@@ -64,7 +64,7 @@ def validate(model, val_loader):
     
     all_scores = torch.cat(all_scores, dim = 0).cpu()
     all_gt = torch.cat(all_gt, dim = 0).numpy()
-    print(f"gt_shape:{all_gt}")
+    # print(f"gt_shape:{all_gt}")
     # print(f"all_scores: {all_scores[:10]}")
     all_scores = torch.argsort(all_scores, dim = 1).numpy()
     # print(f"all_scores: {all_scores[:10]}")
