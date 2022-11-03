@@ -65,7 +65,7 @@ def get_EPIC_parser():
     parser.add_argument('--resume', default='', type=str,
                     help='path to latest checkpoint (default: none)')
 
-    parser.add_argument('--freeze', default=1, type=int, choices=[0,1])
+    parser.add_argument('--freeze', default=0, type=int, choices=[0,1])
     parser.add_argument('--repr_type', type=str, choices=['Clip', 'ImageNet', 'Segmentation', 'Action'])
     
     args = parser.parse_args()
