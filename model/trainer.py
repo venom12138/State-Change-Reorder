@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import git
 import datetime
+from itertools import permutations
 # TODO change to relative path
 sys.path.append('/home/venom/projects/XMem/')
 # from model.losses import LossComputer
@@ -21,6 +22,16 @@ from util.log_integrator import Integrator
 from tqdm import tqdm
 import scipy
 from scipy import stats
+
+# scores: [B, 5, 5]
+def get_max_permutation(scores):
+    # scores: B,5,5
+    all_perms = torch.tensor(list(permutations(range(5)))).to(scores.device) # [120, 5]
+    perms_scores = torch.zeros((scores.shape[0], 120)).to(scores.device) # b,120
+    for b in range(all_perms.shape[1]-1):        
+        perms_scores[:] += scores[:, all_perms[:, b], all_perms[:, b+1]]
+    # print(f"perms_scores: {perms_scores}")
+    return torch.flip(all_perms[torch.argmax(perms_scores, dim=1)], [1]) # B,5
 
 def spearman_acc(story, gt_order):
     return scipy.stats.spearmanr(story, gt_order)[0]
@@ -46,9 +57,11 @@ def validate(model, val_loader):
     for ti, data in tqdm(enumerate(val_loader)):  
         with torch.no_grad():
             frames = data['rgb'].cuda()
-            gt_order = data['gt_order'] # B,5
+            gt_order = data['gt_order'].cuda()
             img_features = model.encode(frames) # [B, num_frames, 2048/1024]
-            scores = torch.zeros((img_features.shape[0], img_features.shape[1])).cuda() # [B, num_frames],代表了每一帧的得分
+            scores = torch.zeros(img_features.shape[0], img_features.shape[1], img_features.shape[1]).cuda() # [B, num_frames, num_frames]
+            # scores[b, i,j]代表第b个batch i>j的概率
+            # scores = torch.zeros((img_features.shape[0], img_features.shape[1])).cuda() # [B, num_frames],代表了每一帧的得分
             for idx1 in range(5):
                 for idx2 in range(5):
                     if idx1 == idx2:
@@ -56,18 +69,15 @@ def validate(model, val_loader):
                     else:
                         cat_feature = torch.cat([img_features[:, idx1], img_features[:, idx2]], dim = 1)
                         logits = model.classify(cat_feature) # [B,2] 
-                        # 【0，1】代表 idx1 > idx2
-                        index = torch.argmax(logits, dim = 1) # [B]
-                        scores[:,idx1] += index
-            all_scores.append(scores)
+                        prob = torch.softmax(logits, dim = 1) # [B,2]
+                        scores[:, idx1, idx2] = prob[:, 1] # [B]
+                        
+            perm = get_max_permutation(scores) # B, 5
+            all_scores.append(perm)
             all_gt.append(gt_order)
     
     all_scores = torch.cat(all_scores, dim = 0).cpu()
     all_gt = torch.cat(all_gt, dim = 0).numpy()
-    # print(f"gt_shape:{all_gt}")
-    # print(f"all_scores: {all_scores[:10]}")
-    all_scores = torch.argsort(all_scores, dim = 1).numpy()
-    # print(f"all_scores: {all_scores[:10]}")
 
     Spearman = np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
 
