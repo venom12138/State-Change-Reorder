@@ -148,14 +148,14 @@ class Trainer:
                     
                     all_logits.append(logits)
                     all_target.append(target)
-        print(f"info:{data['info']}")
-        print(f"all_target:{torch.stack(all_target, 0)}")
-        print(f"all_logits:{torch.stack(all_logits, 0)}")
+        # print(f"info:{data['info']}")
+        # print(f"all_target:{torch.stack(all_target, 0)}")
+        # print(f"all_logits:{torch.stack(all_logits, 0)}")
         # dd
         all_logits = torch.stack(all_logits, 0).flatten(start_dim=0, end_dim=1)
         all_target = torch.stack(all_target, 0).flatten(start_dim=0, end_dim=1)
-        print(f"all_target:{all_target}")
-        print(f"all_logits:{all_logits}")
+        # print(f"all_target:{all_target}")
+        # print(f"all_logits:{all_logits}")
         losses = self.loss_computer.compute(all_logits, all_target)
         
         # recording
