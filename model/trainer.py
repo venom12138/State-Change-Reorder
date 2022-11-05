@@ -77,7 +77,7 @@ def validate(model, val_loader):
             all_gt.append(gt_order)
     
     all_scores = torch.cat(all_scores, dim = 0).cpu()
-    all_gt = torch.cat(all_gt, dim = 0).numpy()
+    all_gt = torch.cat(all_gt, dim = 0).cpu().numpy()
 
     Spearman = np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
 

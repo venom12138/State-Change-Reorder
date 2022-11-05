@@ -18,15 +18,15 @@ class FrameReorderNet(nn.Module):
             self.Classifier = Classifier(1024)
         
         elif self.config['repr_type'] == 'ImageNet':
-            self.Encoder = ImageNetEncoder() # 输出是2048维 
+            self.Encoder = ImageNetEncoder(config) # 输出是2048维 
             self.Classifier = Classifier(2048)
             
         elif self.config['repr_type'] == 'Segmentation':
-            self.Encoder = KeyEncoder() # 输出是1024维
+            self.Encoder = KeyEncoder(config) # 输出是1024维
             self.Classifier = Classifier(1024)
         
         elif self.config['repr_type'] == 'Action':
-            self.Encoder = VideoMae() # 输出是1024维
+            self.Encoder = VideoMae(config) # 输出是1024维
             self.Classifier = Classifier(768)
         
         else:

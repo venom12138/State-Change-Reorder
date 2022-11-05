@@ -29,7 +29,7 @@ def get_sinusoid_encoding_table(n_position, d_hid):
 
 # Segmentation
 class KeyEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
         network = resnet.resnet50(pretrained=True)
         self.conv1 = network.conv1
@@ -58,7 +58,7 @@ class KeyEncoder(nn.Module):
 
 # ImageNet
 class ImageNetEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
         network = resnet.resnet50(pretrained=True)
         self.conv1 = network.conv1
@@ -86,11 +86,14 @@ class ImageNetEncoder(nn.Module):
         return x.flatten(start_dim=1)
 
 class VideoMae(nn.Module):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
         self.model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
         self.model.embeddings.position_embeddings = get_sinusoid_encoding_table(14*14*5, self.model.config.hidden_size)
-        # print(f"patchsize:{self.model.encoder.patch_embed.patch_size}")
+        if not config['use_position_embedding']:
+            print('not use position embedding')
+            self.model.embeddings.position_embeddings = torch.zeros_like(self.model.embeddings.position_embeddings, requires_grad=False)
+        
         self.avgpool = nn.AdaptiveAvgPool2d((1,1)) # 768
     
     # B, numframes*2, 3, 224, 224
