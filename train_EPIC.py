@@ -167,9 +167,10 @@ try:
         current_epoch += 1
         print(f'Current epoch: {current_epoch}')
 
-        # Train loop
-        model.train()
+        
         for data in train_loader:
+            # Train loop
+            model.train()
             model.do_pass(data, total_iter, val_loader)
             total_iter += 1
 
