@@ -27,7 +27,7 @@ class FrameReorderNet(nn.Module):
         
         elif self.config['repr_type'] == 'Action':
             self.Encoder = VideoMae(config) # 输出是1024维
-            self.Classifier = Classifier(768)
+            self.Classifier = Classifier(1024)
         
         else:
             raise NotImplementedError
