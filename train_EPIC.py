@@ -174,7 +174,7 @@ try:
             model.do_pass(data, total_iter, val_loader)
             total_iter += 1
 
-            if total_iter >= config['iterations']:
+            if total_iter > config['iterations']:
                 break
             
             # if total_iter % 1000 == 0 and exp is not None:
