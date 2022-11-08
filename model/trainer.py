@@ -40,28 +40,43 @@ def spearman_acc(story, gt_order):
 def absolute_distance(story, gt_order):
     return np.mean(np.abs(np.array(story) - np.array(gt_order)))
 
+# def pairwise_acc(story, gt_order):
+#     correct = 0
+#     # gt order 原本比如是 3，2，4，0，1
+#     # predict的story是 4，0，2，3，1
+#     # 那么将3：0，2：1，4：2，0：3，1：4做这样一个替换
+#     # story就变成了 2，3，1，0，4
+#     # 然后gt_order就变为了0，1，2，3，4
+#     for i in range(len(gt_order)):
+#         index = story.index(gt_order[i])
+#         story[index] = i
+        
+#     gt_order = list(range(len(gt_order)))
+#     total = len(story) * (len(story)-1) // 2
+#     for idx1 in range(len(story)):
+#         for idx2 in range(idx1+1, len(story)):
+#             if story[idx1] < story[idx2]:
+#                 correct += 1
+#     return correct/total
 def pairwise_acc(story, gt_order):
     correct = 0
-    # gt order 原本比如是 3，2，4，0，1
-    # predict的story是 4，0，2，3，1
-    # 那么将3：0，2：1，4：2，0：3，1：4做这样一个替换
-    # story就变成了 2，3，1，0，4
-    # 然后gt_order就变为了0，1，2，3，4
-    for i in range(len(gt_order)):
-        index = story.index(gt_order[i])
-        story[index] = i
-        
-    gt_order = list(range(len(gt_order)))
+    story = story.cpu().numpy().tolist()
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
-            if story[idx1] < story[idx2]:
+            gt_order.index(story[idx1])
+            if gt_order.index(story[idx1]) < gt_order.index(story[idx2]):
                 correct += 1
     return correct/total
 
 def validate(model, val_loader):
     all_scores = []
     all_gt = []
+    model.eval()
     # Start eval
     for ti, data in tqdm(enumerate(val_loader)):  
         with torch.no_grad():
@@ -183,7 +198,9 @@ class Trainer:
                 train_metrics = self.train_integrator.finalize()
                 
                 if self.logger is not None:
+                    self.model.eval()
                     eval_metrics = validate(self.model.module, val_loader)
+                    self.model.train()
                     self.logger.write(prefix='reorder', train_metrics=train_metrics, eval_metrics=eval_metrics,**{'lr':self.scheduler.get_last_lr()[0],
                                     'time':(time.time()-self.last_time)/self.log_text_interval})
                     all_dicts = {**train_metrics, **{'lr':self.scheduler.get_last_lr()[0],

@@ -19,7 +19,7 @@ from tqdm import tqdm
 import clip
 from itertools import permutations
 from torch.optim.swa_utils import update_bn
-
+from copy import deepcopy 
 # scores: [B, 5, 5]
 def get_max_permutation(scores):
     # scores: B,5,5
@@ -40,22 +40,38 @@ def absolute_distance(story, gt_order):
 
 def pairwise_acc(story, gt_order):
     correct = 0
-    # gt order 原本比如是 3，2，4，0，1
-    # predict的story是 4，0，2，3，1
-    # 那么将3：0，2：1，4：2，0：3，1：4做这样一个替换
-    # story就变成了 2，3，1，0，4
-    # 然后gt_order就变为了0，1，2，3，4
-    for i in range(len(gt_order)):
-        index = story.index(gt_order[i])
-        story[index] = i
-        
-    gt_order = list(range(len(gt_order)))
+    story = story.cpu().numpy().tolist()
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
-            if story[idx1] < story[idx2]:
+            gt_order.index(story[idx1])
+            if gt_order.index(story[idx1]) < gt_order.index(story[idx2]):
                 correct += 1
     return correct/total
+
+# def pairwise_acc(story, gt_order):
+#     correct = 0
+#     # gt order 原本比如是 3，2，4，0，1
+#     # predict的story是 4，0，2，3，1
+#     # 那么将3：0，2：1，4：2，0：3，1：4做这样一个替换
+#     # story就变成了 2，3，1，0，4
+#     # 然后gt_order就变为了0，1，2，3，4
+#     story = story.cpu().numpy().tolist()
+#     for i in range(len(gt_order)):
+#         index = story.index(gt_order[i])
+#         story[index] = i
+        
+#     gt_order = list(range(len(gt_order)))
+#     total = len(story) * (len(story)-1) // 2
+#     for idx1 in range(len(story)):
+#         for idx2 in range(idx1+1, len(story)):
+#             if story[idx1] < story[idx2]:
+#                 correct += 1
+#     return correct/total
 
 """
 Arguments loading
@@ -73,6 +89,8 @@ parser.add_argument('--num_frames', default=5, type=int)
 parser.add_argument('--benchmark', action='store_true', help='enable to disable amp for FPS benchmarking')
 parser.add_argument('--repr_type', type=str, choices=['Clip', 'ImageNet', 'Segmentation', 'Action'])
 parser.add_argument('--freeze', default=0, type=int, choices=[0,1])
+parser.add_argument('--use_position_embedding', default=1, type=int, choices=[0,1])
+
 args = parser.parse_args()
 
 config = vars(args)
@@ -102,8 +120,12 @@ train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=False, nu
 model = FrameReorderNet(config).cuda().eval()
 # load weights
 model_weights = torch.load(config['model'])
+sd_before_load = deepcopy(model.state_dict())
 model.load_state_dict(model_weights)
+sd_after_load = deepcopy(model.state_dict())
 
+same_keys = [k for k in sd_before_load if torch.equal(sd_before_load[k], sd_after_load[k])]
+print(f"keys unloaded:{same_keys}")
 all_scores = []
 all_gt = []
 
@@ -137,13 +159,21 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
     all_gt = torch.cat(all_gt, dim = 0).cpu().numpy()
     
     print('Spearman:')
-    print(np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
+    spearman = np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
+    print(spearman)
 
     print('Absoulte Distance:')
-    print(np.mean([absolute_distance(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
+    ab_distance = np.mean([absolute_distance(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
+    print(ab_distance)
 
     print('Pairwise:')
-    print(np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
+    pairwise_acc = np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
+    print(pairwise_acc)
     
+    with open(os.path.join(out_path, 'scores.txt'), 'w') as f:
+        f.writelines(f"Spearman:{spearman}\n")
+        f.writelines(f"ab_distance:{ab_distance}\n")
+        f.writelines(f"pairwise_acc:{pairwise_acc}\n")
+    f.close()
 
 print(f'Max allocated memory (MB): {torch.cuda.max_memory_allocated() / (2**20)}')
