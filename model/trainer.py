@@ -26,6 +26,7 @@ from scipy import stats
 # scores: [B, 5, 5]
 def get_max_permutation(scores):
     # scores: B,5,5
+    # 0 1 2 3 4
     all_perms = torch.tensor(list(permutations(range(5)))).to(scores.device) # [120, 5]
     perms_scores = torch.zeros((scores.shape[0], 120)).to(scores.device) # b,120
     for b in range(all_perms.shape[1]-1):        
