@@ -19,9 +19,11 @@ from tqdm import tqdm
 import clip
 from itertools import permutations
 from torch.optim.swa_utils import update_bn
+
 # scores: [B, 5, 5]
 def get_max_permutation(scores):
     # scores: B,5,5
+    # 0 1 2 3 4
     all_perms = torch.tensor(list(permutations(range(5)))).to(scores.device) # [120, 5]
     perms_scores = torch.zeros((scores.shape[0], 120)).to(scores.device) # b,120
     for b in range(all_perms.shape[1]-1):        
@@ -29,20 +31,6 @@ def get_max_permutation(scores):
     # print(f"perms_scores: {perms_scores}")
     return torch.flip(all_perms[torch.argmax(perms_scores, dim=1)], [1]) # B,5
 
-# def spearman_acc(story):
-#     return scipy.stats.spearmanr(story, [0,1,2,3,4])[0]
-
-# def absolute_distance(story):
-#     return np.mean(np.abs(np.array(story) - np.array([0,1,2,3,4])))
-
-# def pairwise_acc(story):
-#     correct = 0
-#     total = len(story) * (len(story)-1) // 2
-#     for idx1 in range(len(story)):
-#         for idx2 in range(idx1+1, len(story)):
-#             if story[idx1] < story[idx2]:
-#                 correct += 1
-#     return correct/total
 
 def spearman_acc(story, gt_order):
     return scipy.stats.spearmanr(story, gt_order)[0]
@@ -52,8 +40,16 @@ def absolute_distance(story, gt_order):
 
 def pairwise_acc(story, gt_order):
     correct = 0
-    index = np.argsort(gt_order)
-    story = list(np.array(story)[index]) # 这样gtorder就变成01234了，相当于交换了一下
+    # gt order 原本比如是 3，2，4，0，1
+    # predict的story是 4，0，2，3，1
+    # 那么将3：0，2：1，4：2，0：3，1：4做这样一个替换
+    # story就变成了 2，3，1，0，4
+    # 然后gt_order就变为了0，1，2，3，4
+    for i in range(len(gt_order)):
+        index = story.index(gt_order[i])
+        story[index] = i
+        
+    gt_order = list(range(len(gt_order)))
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
@@ -108,20 +104,6 @@ model = FrameReorderNet(config).cuda().eval()
 model_weights = torch.load(config['model'])
 model.load_state_dict(model_weights)
 
-##### correct batch norm
-# for data in tqdm(train_loader):
-#     frames = data['rgb'].cuda() # [B, num_frames, 3, H, W]
-#     gt_order = data['gt_order'].cuda() # [B, num_frames]
-#     img_features = model.encode(frames) # [B, num_frames, 2048/1024/768]
-    
-#     for idx1 in range(config['num_frames']):
-#         for idx2 in range(config['num_frames']):
-#             if idx1 == idx2:
-#                 continue
-#             else:
-#                 cat_feature = torch.cat([img_features[:, idx1], img_features[:, idx2]], dim = 1)
-#                 logits = model.classify(cat_feature) # [B,2]
-
 all_scores = []
 all_gt = []
 
@@ -163,39 +145,5 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
     print('Pairwise:')
     print(np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
     
-    
-    # for ti, data in tqdm(enumerate(val_loader)):  
-    #     with torch.no_grad():
-    #         frames = data['rgb'].cuda()
-    #         gt_order = data['gt_order'] # B,5
-    #         img_features = model.encode(frames) # [B, num_frames, 2048/1024]
-    #         scores = torch.zeros((img_features.shape[0], img_features.shape[1])).cuda() # [B, num_frames],代表了每一帧的得分
-    #         for idx1 in range(5):
-    #             for idx2 in range(5):
-    #                 if idx1 == idx2:
-    #                     continue
-    #                 else:
-    #                     cat_feature = torch.cat([img_features[:, idx1], img_features[:, idx2]], dim = 1)
-    #                     logits = model.classify(cat_feature) # [B,2] 
-    #                     # 【0，1】代表 idx1 > idx2
-    #                     index = torch.argmax(logits, dim = 1) # [B]
-    #                     scores[:,idx1] += index
-    #         all_scores.append(scores)
-    #         all_gt.append(gt_order)
-    
-    # all_scores = torch.cat(all_scores, dim = 0).cpu()
-    # all_gt = torch.cat(all_gt, dim = 0).numpy()
-    # # print(f"gt_shape:{all_gt}")
-    # # print(f"all_scores: {all_scores[:10]}")
-    # all_scores = torch.argsort(all_scores, dim = 1).numpy()
-
-    # print('Spearman:')
-    # print(np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
-
-    # print('Absoulte Distance:')
-    # print(np.mean([absolute_distance(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
-
-    # print('Pairwise:')
-    # print(np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))]))
 
 print(f'Max allocated memory (MB): {torch.cuda.max_memory_allocated() / (2**20)}')
