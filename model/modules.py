@@ -88,7 +88,7 @@ class ImageNetEncoder(nn.Module):
 class VideoMae(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-large")
+        self.model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
         self.model.embeddings.position_embeddings = get_sinusoid_encoding_table(14*14*5, self.model.config.hidden_size)
         if not config['use_position_embedding']:
             print('not use position embedding')
