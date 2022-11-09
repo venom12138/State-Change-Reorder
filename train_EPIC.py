@@ -68,6 +68,8 @@ def get_EPIC_parser():
     parser.add_argument('--freeze', default=0, type=int, choices=[0,1])
     parser.add_argument('--repr_type', type=str, choices=['Clip', 'ImageNet', 'Segmentation', 'Action'])
     parser.add_argument('--use_position_embedding', default=1, type=int, choices=[0,1])
+    parser.add_argument('--openword_test', default=0, type=int, choices=[0,1])
+    
     args = parser.parse_args()
     return {**vars(args), **{'amp': not args.no_amp}}
 
@@ -106,7 +108,7 @@ print(f'We are assuming {config["num_gpus"]} GPUs.')
 print(f'We are now starting stage EPIC')
 
 if config['debug']:
-    config['batch_size'] = 4
+    config['batch_size'] = 2
     config['num_frames'] = 5
     config['iterations'] = 5
     config['log_text_interval']  = 1
@@ -141,12 +143,12 @@ def construct_loader(dataset):
                             worker_init_fn=worker_init_fn, drop_last=True)
     return train_sampler, train_loader
 
-train_dataset = EPICDataset(data_root=config['epic_root'], yaml_root=config['yaml_root'], 
+train_dataset = EPICDataset(data_root=config['epic_root'], yaml_root=config['yaml_root'], openword_test=config['openword_test'], 
                         num_frames=config['num_frames'], repr_type=config['repr_type'])
 
 train_sampler, train_loader = construct_loader(train_dataset)
-val_dataset = EPICtestDataset(data_root='./val_data', yaml_root='./val_data/EPIC100_state_positive_val.yaml', 
-                            valset_yaml_root='./val_data/reordering_val.yaml', num_frames=5, repr_type=config['repr_type'])
+val_dataset = EPICtestDataset(data_root='./val_data', yaml_root='./val_data/EPIC100_state_positive_val.yaml', valset_yaml_root='./val_data/reordering_val.yaml', 
+                        num_frames=5, repr_type=config['repr_type'])
 
 val_loader = DataLoader(dataset=val_dataset, batch_size=7, shuffle=False, num_workers=4, pin_memory=True)
 

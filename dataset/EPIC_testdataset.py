@@ -24,6 +24,11 @@ class EPICtestDataset(Dataset):
         self.num_frames = num_frames
         with open(os.path.join(yaml_root), 'r') as f:
             self.data_info = yaml.safe_load(f)
+        f.close()
+        
+        with open(os.path.join(self.data_root, 'val_open_word.yaml'), 'r') as f:
+            self.open_word_info = yaml.safe_load(f)
+        f.close()
         
         self.vids = []
         # 将没有标注的都去掉
@@ -80,6 +85,7 @@ class EPICtestDataset(Dataset):
             'rgb': images, # [num_frames, 3, H, W]
             'gt_order': gt_order, # [num_frames]
             'text':video_value['narration'],
+            'open_word_type':self.open_word_info[self.vids[idx]]
         }
 
         return data

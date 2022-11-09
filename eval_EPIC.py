@@ -40,11 +40,17 @@ def absolute_distance(story, gt_order):
 
 def pairwise_acc(story, gt_order):
     correct = 0
-    story = story.cpu().numpy().tolist()
+    
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
+    
     try:
         gt_order = gt_order.cpu().numpy().tolist()
     except:
         gt_order = gt_order.tolist()
+    
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
@@ -90,7 +96,8 @@ parser.add_argument('--benchmark', action='store_true', help='enable to disable 
 parser.add_argument('--repr_type', type=str, choices=['Clip', 'ImageNet', 'Segmentation', 'Action'])
 parser.add_argument('--freeze', default=0, type=int, choices=[0,1])
 parser.add_argument('--use_position_embedding', default=1, type=int, choices=[0,1])
-
+parser.add_argument('--openword_test', default=0, type=int, choices=[0,1])
+    
 args = parser.parse_args()
 
 config = vars(args)
@@ -108,15 +115,13 @@ out_path = args.output
 
 print(out_path)
 
-val_dataset = EPICtestDataset(data_root=args.EPIC_path, yaml_root=args.yaml_path, 
-                            valset_yaml_root=args.valset_yaml_path, num_frames=5, repr_type=args.repr_type)
+val_dataset = EPICtestDataset(data_root=args.EPIC_path, yaml_root=args.yaml_path, valset_yaml_root=args.valset_yaml_path, 
+                            num_frames=5, repr_type=args.repr_type)
 torch.autograd.set_grad_enabled(False)
 
 val_loader = DataLoader(dataset=val_dataset, batch_size=7, shuffle=False, num_workers=4, pin_memory=True)
 
-train_dataset = EPICDataset(data_root='./EPIC_train', yaml_root='./EPIC_train/EPIC100_state_positive_train.yaml', 
-                        num_frames=config['num_frames'], repr_type=config['repr_type'])
-train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=False, num_workers=8, pin_memory=True)
+
 model = FrameReorderNet(config).cuda().eval()
 # load weights
 model_weights = torch.load(config['model'])
@@ -129,10 +134,16 @@ print(f"keys unloaded:{same_keys}")
 all_scores = []
 all_gt = []
 
+open_word_acc = {'svsn':{'scores':[], 'gt':[]}, 
+                'svnn':{'scores':[], 'gt':[]}, 
+                'nvnn':{'scores':[], 'gt':[]}, 
+                'nvsn':{'scores':[], 'gt':[]}}
 # Start eval
 with torch.cuda.amp.autocast(enabled=not args.benchmark):
     for ti, data in tqdm(enumerate(val_loader)):  
         with torch.no_grad():
+            openword_type = data['open_word_type']
+            
             frames = data['rgb'].cuda()
             gt_order = data['gt_order'].cuda()
             img_features = model.encode(frames) # [B, num_frames, 2048/1024]
@@ -154,6 +165,10 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
             perm = get_max_permutation(scores) # B, 5
             all_scores.append(perm)
             all_gt.append(gt_order)
+            for i in range(perm.shape[0]):
+                # print(openword_type[i])
+                open_word_acc[openword_type[i]]['scores'].append(perm[i].cpu().numpy())
+                open_word_acc[openword_type[i]]['gt'].append(gt_order[i].cpu().numpy())
             
     all_scores = torch.cat(all_scores, dim = 0).cpu()
     all_gt = torch.cat(all_gt, dim = 0).cpu().numpy()
@@ -167,13 +182,29 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
     print(ab_distance)
 
     print('Pairwise:')
-    pairwise_acc = np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
-    print(pairwise_acc)
+    pair_acc = np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
+    print(pair_acc)
     
     with open(os.path.join(out_path, 'scores.txt'), 'w') as f:
+        f.writelines('All:\n')
         f.writelines(f"Spearman:{spearman}\n")
         f.writelines(f"ab_distance:{ab_distance}\n")
-        f.writelines(f"pairwise_acc:{pairwise_acc}\n")
+        f.writelines(f"pairwise_acc:{pair_acc}\n")
+        for key in open_word_acc.keys():
+            f.writelines(f'{key}:\n')
+            key_spearman = np.mean([spearman_acc(open_word_acc[key]['scores'][i], open_word_acc[key]['gt'][i]) for i in range(len(open_word_acc[key]['scores']))])
+            key_ab_distance = np.mean([absolute_distance(open_word_acc[key]['scores'][i], open_word_acc[key]['gt'][i]) for i in range(len(open_word_acc[key]['scores']))])               
+            key_pairwise_acc = np.mean([pairwise_acc(open_word_acc[key]['scores'][i], open_word_acc[key]['gt'][i]) for i in range(len(open_word_acc[key]['scores']))])
+            f.writelines(f"Spearman:{key_spearman}\n")
+            f.writelines(f"ab_distance:{key_ab_distance}\n")
+            f.writelines(f"pairwise_acc:{key_pairwise_acc}\n")
     f.close()
+    
+    
+    # for key in open_word_acc.keys():
+    #     print(key)
+    #     print(len(open_word_acc[key]['scores']))
+        
+    #     print(open_word_acc[key]['scores'])
 
 print(f'Max allocated memory (MB): {torch.cuda.max_memory_allocated() / (2**20)}')

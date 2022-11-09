@@ -60,7 +60,10 @@ def absolute_distance(story, gt_order):
 #     return correct/total
 def pairwise_acc(story, gt_order):
     correct = 0
-    story = story.cpu().numpy().tolist()
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
     try:
         gt_order = gt_order.cpu().numpy().tolist()
     except:
@@ -76,10 +79,16 @@ def pairwise_acc(story, gt_order):
 def validate(model, val_loader):
     all_scores = []
     all_gt = []
+    open_word_acc = {'svsn':{'scores':[], 'gt':[]}, 
+                'svnn':{'scores':[], 'gt':[]}, 
+                'nvnn':{'scores':[], 'gt':[]}, 
+                'nvsn':{'scores':[], 'gt':[]}}
     model.eval()
     # Start eval
     for ti, data in tqdm(enumerate(val_loader)):  
         with torch.no_grad():
+            openword_type = data['open_word_type']
+            
             frames = data['rgb'].cuda()
             gt_order = data['gt_order'].cuda()
             img_features = model.encode(frames) # [B, num_frames, 2048/1024]
@@ -99,19 +108,29 @@ def validate(model, val_loader):
             perm = get_max_permutation(scores) # B, 5
             all_scores.append(perm)
             all_gt.append(gt_order)
+            for i in range(perm.shape[0]):
+                # print(openword_type[i])
+                open_word_acc[openword_type[i]]['scores'].append(perm[i].cpu().numpy())
+                open_word_acc[openword_type[i]]['gt'].append(gt_order[i].cpu().numpy())
     
     all_scores = torch.cat(all_scores, dim = 0).cpu()
     all_gt = torch.cat(all_gt, dim = 0).cpu().numpy()
 
     Spearman = np.mean([spearman_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
-
     Absoulte_Distance = np.mean([absolute_distance(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
-
     Pairwise = np.mean([pairwise_acc(all_scores[i], all_gt[i]) for i in range(len(all_scores))])
-    
-    return {'Spearman':Spearman, 
-            'Absoulte_Distance':Absoulte_Distance, 
-            'Pairwise':Pairwise}
+    openword_dict = {}
+    for key in open_word_acc.keys():
+        key_spearman = np.mean([spearman_acc(open_word_acc[key]['scores'][i], open_word_acc[key]['gt'][i]) for i in range(len(open_word_acc[key]['scores']))])
+        key_ab_distance = np.mean([absolute_distance(open_word_acc[key]['scores'][i], open_word_acc[key]['gt'][i]) for i in range(len(open_word_acc[key]['scores']))])               
+        key_pairwise_acc = np.mean([pairwise_acc(open_word_acc[key]['scores'][i], open_word_acc[key]['gt'][i]) for i in range(len(open_word_acc[key]['scores']))])
+        openword_dict.update({f'{key}/Spearman':key_spearman, 
+                        f'{key}/Absoulte_Distance':key_ab_distance, 
+                        f'{key}/Pairwise':key_pairwise_acc})
+        
+    return {**{'all/Spearman':Spearman, 
+            'all/Absoulte_Distance':Absoulte_Distance, 
+            'all/Pairwise':Pairwise}, **openword_dict}
 
 class Trainer:
     def __init__(self, config, logger, local_rank, world_size):
