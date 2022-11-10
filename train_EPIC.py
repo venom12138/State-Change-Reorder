@@ -158,7 +158,7 @@ total_iter = 0
 total_epoch = math.ceil(config['iterations']/len(train_loader))
 current_epoch = total_iter // len(train_loader)
 print(f'We approximately use {total_epoch} epochs.')
-
+print('Dataset length: ', len(train_dataset))
 # Need this to select random bases in different workers
 np.random.seed(np.random.randint(2**30-1) + local_rank*100)
 
