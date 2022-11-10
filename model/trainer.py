@@ -35,10 +35,35 @@ def get_max_permutation(scores):
     return torch.flip(all_perms[torch.argmax(perms_scores, dim=1)], [1]) # B,5
 
 def spearman_acc(story, gt_order):
-    return scipy.stats.spearmanr(story, gt_order)[0]
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
+        
+    story_rank = [story.index(i) for i in range(5)]
+    gt_rank = [gt_order.index(i) for i in range(5)]
+    
+    return scipy.stats.spearmanr(story_rank, gt_rank)[0]
 
 def absolute_distance(story, gt_order):
-    return np.mean(np.abs(np.array(story) - np.array(gt_order)))
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
+    
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
+        
+    story_rank = [story.index(i) for i in range(5)]
+    gt_rank = [gt_order.index(i) for i in range(5)]
+
+    return np.mean(np.abs(np.array(story_rank) - np.array(gt_rank)))
 
 # def pairwise_acc(story, gt_order):
 #     correct = 0
@@ -58,6 +83,7 @@ def absolute_distance(story, gt_order):
 #             if story[idx1] < story[idx2]:
 #                 correct += 1
 #     return correct/total
+
 def pairwise_acc(story, gt_order):
     correct = 0
     try:
@@ -71,7 +97,6 @@ def pairwise_acc(story, gt_order):
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
-            gt_order.index(story[idx1])
             if gt_order.index(story[idx1]) < gt_order.index(story[idx2]):
                 correct += 1
     return correct/total

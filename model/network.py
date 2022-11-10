@@ -60,7 +60,8 @@ class FrameReorderNet(nn.Module):
             return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 2048]
         else:
             # x: B, nf, 3, H, W
-            x = x.repeat(1,2,1,1,1)
+            x = torch.repeat_interleave(x, repeats=2, dim=1)
+            # x = x.repeat(1,2,1,1,1)
             # x: B, nf*2, 3, H, W
             x = self.Encoder(x) 
             return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 768]

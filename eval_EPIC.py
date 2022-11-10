@@ -33,10 +33,35 @@ def get_max_permutation(scores):
 
 
 def spearman_acc(story, gt_order):
-    return scipy.stats.spearmanr(story, gt_order)[0]
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
+        
+    story_rank = [story.index(i) for i in range(5)]
+    gt_rank = [gt_order.index(i) for i in range(5)]
+    
+    return scipy.stats.spearmanr(story_rank, gt_rank)[0]
 
 def absolute_distance(story, gt_order):
-    return np.mean(np.abs(np.array(story) - np.array(gt_order)))
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
+    
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
+        
+    story_rank = [story.index(i) for i in range(5)]
+    gt_rank = [gt_order.index(i) for i in range(5)]
+
+    return np.mean(np.abs(np.array(story_rank) - np.array(gt_rank)))
 
 def pairwise_acc(story, gt_order):
     correct = 0

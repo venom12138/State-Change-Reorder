@@ -51,14 +51,23 @@ from scipy import stats
 # scores = torch.randn(2,5,5)
 # # print(scores)
 # get_max_permutation(scores)
-def spearman_acc(story, gt_order):
-    return scipy.stats.spearmanr(story, gt_order)[0]
 
-def absolute_distance(story, gt_order):
-    return np.mean(np.abs(np.array(story) - np.array(gt_order)))
+# def spearman_acc(story, gt_order):
+#     return scipy.stats.spearmanr(story, gt_order)[0]
+
+# def absolute_distance(story, gt_order):
+#     return np.mean(np.abs(np.array(story) - np.array(gt_order)))
 
 def pairwise_acc(story, gt_order):
     correct = 0
+    try:
+        story = story.cpu().numpy().tolist()
+    except:
+        story = story.tolist()
+    try:
+        gt_order = gt_order.cpu().numpy().tolist()
+    except:
+        gt_order = gt_order.tolist()
     total = len(story) * (len(story)-1) // 2
     for idx1 in range(len(story)):
         for idx2 in range(idx1+1, len(story)):
@@ -67,18 +76,22 @@ def pairwise_acc(story, gt_order):
                 correct += 1
     return correct/total
 
+# # all_perms = list(permutations(range(5)))
+# all_perms = np.array([2,3,1,4,0])
+# gt_order = np.array([3,4,2,1,0])
+# print(f"spearman_acc: {spearman_acc(all_perms, gt_order)}")
+# print(f"absolute_distance: {absolute_distance(all_perms, gt_order)}")
+# print(f"pairwise_acc: {pairwise_acc(all_perms, gt_order)}")
 
-# all_perms = list(permutations(range(5)))
-all_perms = [[4,3,0,2,1]]
-gt_order = [3,4,2,1,0]
-all_corrects = []
-for story in all_perms:
-    # correct = 0
-    # total = len(story) * (len(story)-1) // 2
-    # for idx1 in range(len(story)):
-    #     for idx2 in range(idx1+1, len(story)):
-    #         if story[idx1] < story[idx2]:
-    #             correct += 1
-    
-    all_corrects.append(pairwise_acc(story, gt_order))
-print(np.mean(all_corrects))
+all_perms = [2, 3, 1, 4, 0] #  -> [4, 2, 0, 1, 3]
+gt_order = [3, 4, 2, 1, 0] # -> [4, 3, 2, 0, 1]
+
+# gt order 原本比如是 3，2，4，0，1 -> 0,1,2,3,4
+# predict的story是 4，0，2，3，1 -> 
+new_perms = [all_perms.index(i) for i in range(5)]
+gt_rank = [gt_order.index(i) for i in range(5)]
+# for i in range(5):
+#     gt_rank_i = gt_order.index(i)
+#     pred_rank_i = all_perms.index(i)
+print(new_perms)
+print(gt_rank)
