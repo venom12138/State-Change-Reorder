@@ -85,7 +85,8 @@ class EPICtestDataset(Dataset):
             'rgb': images, # [num_frames, 3, H, W]
             'gt_order': gt_order, # [num_frames]
             'text':video_value['narration'],
-            'open_word_type':self.open_word_info[self.vids[idx]]
+            'open_word_type':self.open_word_info[self.vids[idx]],
+            'video_key': self.vids[idx],
         }
 
         return data

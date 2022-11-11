@@ -20,6 +20,8 @@ import clip
 from itertools import permutations
 from torch.optim.swa_utils import update_bn
 from copy import deepcopy 
+import csv
+
 # scores: [B, 5, 5]
 def get_max_permutation(scores):
     # scores: B,5,5
@@ -163,11 +165,13 @@ open_word_acc = {'svsn':{'scores':[], 'gt':[]},
                 'svnn':{'scores':[], 'gt':[]}, 
                 'nvnn':{'scores':[], 'gt':[]}, 
                 'nvsn':{'scores':[], 'gt':[]}}
+per_video_results = {}
 # Start eval
 with torch.cuda.amp.autocast(enabled=not args.benchmark):
     for ti, data in tqdm(enumerate(val_loader)):  
         with torch.no_grad():
             openword_type = data['open_word_type']
+            video_key = data['video_key']
             
             frames = data['rgb'].cuda()
             gt_order = data['gt_order'].cuda()
@@ -194,6 +198,7 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
                 # print(openword_type[i])
                 open_word_acc[openword_type[i]]['scores'].append(perm[i].cpu().numpy())
                 open_word_acc[openword_type[i]]['gt'].append(gt_order[i].cpu().numpy())
+                per_video_results.update({video_key[i]:{'scores':perm[i].cpu().numpy(), 'gt':gt_order[i].cpu().numpy()}})
             
     all_scores = torch.cat(all_scores, dim = 0).cpu()
     all_gt = torch.cat(all_gt, dim = 0).cpu().numpy()
@@ -225,11 +230,14 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
             f.writelines(f"pairwise_acc:{key_pairwise_acc}\n")
     f.close()
     
+    with open(os.path.join(out_path, 'per_video_results.csv'), "w", encoding='ascii') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(['key', 'spearman', 'ab_distance', 'pairwise_acc'])
+        for key, value in per_video_results.items():
+            spear_acc = spearman_acc(value['scores'], value['gt'])
+            ab_dis = absolute_distance(value['scores'], value['gt'])
+            pair_acc = pairwise_acc(value['scores'], value['gt'])
+            writer.writerow([key, spear_acc, ab_dis, pair_acc])
     
-    # for key in open_word_acc.keys():
-    #     print(key)
-    #     print(len(open_word_acc[key]['scores']))
-        
-    #     print(open_word_acc[key]['scores'])
 
 print(f'Max allocated memory (MB): {torch.cuda.max_memory_allocated() / (2**20)}')

@@ -234,7 +234,7 @@ class Trainer:
         losses = self.loss_computer.compute(all_logits, all_target)
         
         # recording
-        if self.logger is not None:
+        if self._do_log:
             self.integrator.add_dict(losses)
         
         if self._is_train:
