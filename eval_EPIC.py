@@ -230,7 +230,7 @@ with torch.cuda.amp.autocast(enabled=not args.benchmark):
             f.writelines(f"pairwise_acc:{key_pairwise_acc}\n")
     f.close()
     
-    with open(os.path.join(out_path, 'per_video_results.csv'), "w", encoding='ascii') as csv_file:
+    with open(os.path.join(out_path, f'{output.split('/')[-1]}_per_video_results.csv'), "w", encoding='ascii') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(['key', 'spearman', 'ab_distance', 'pairwise_acc'])
         for key, value in per_video_results.items():
