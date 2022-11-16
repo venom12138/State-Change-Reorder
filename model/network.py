@@ -42,29 +42,27 @@ class FrameReorderNet(nn.Module):
             print('Freezing the encoder')
             for param in self.Encoder.parameters():
                 param.requires_grad = False
+    
     # x: B, nf, 3, H, W
+    # for videoclip x: B, nf, 8, 3, 224, 224
     def encode(self, x):
-        if self.config['repr_type'] != 'Action':
-            if len(x.shape) == 5:
-                batch_size, num_frames = x.shape[:2]
-                x = x.flatten(start_dim=0, end_dim=1) 
-                need_reshape = True
-            else:
-                need_reshape = False
-            
+        assert self.config['repr_type'] != 'Action'
+        if len(x.shape) == 5:
+            batch_size, num_frames = x.shape[:2]
+            x = x.flatten(start_dim=0, end_dim=1) 
             x = self.Encoder(x) 
-            
-            if need_reshape:
-                x = x.view(batch_size, num_frames, *x.shape[1:])
-            
-            return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 2048]
+            x = x.view(batch_size, num_frames, *x.shape[1:])
+        elif len(x.shape) == 6:
+            assert x.shape[2] == 8
+            assert self.config['use_clip_feature']
+            batch_size, num_frames, near_k = x.shape[:3]
+            x = x.flatten(start_dim=0, end_dim=2)
+            x = self.Encoder(x)
+            x = x.view(batch_size, num_frames, near_k, *x.shape[1:])
+            x = torch.mean(x, dim=2)
         else:
-            # x: B, nf, 3, H, W
-            x = torch.repeat_interleave(x, repeats=2, dim=1)
-            # x = x.repeat(1,2,1,1,1)
-            # x: B, nf*2, 3, H, W
-            x = self.Encoder(x) 
-            return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 768]
+            x = self.Encoder(x)
+        return x.to(self.Classifier.classifier[0].weight.dtype)  # [B, numframes, 2048]
     
     # x: [B,1024*2/2048*2] 
     def classify(self, x):

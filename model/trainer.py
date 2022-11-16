@@ -65,25 +65,6 @@ def absolute_distance(story, gt_order):
 
     return np.mean(np.abs(np.array(story_rank) - np.array(gt_rank)))
 
-# def pairwise_acc(story, gt_order):
-#     correct = 0
-#     # gt order 原本比如是 3，2，4，0，1
-#     # predict的story是 4，0，2，3，1
-#     # 那么将3：0，2：1，4：2，0：3，1：4做这样一个替换
-#     # story就变成了 2，3，1，0，4
-#     # 然后gt_order就变为了0，1，2，3，4
-#     for i in range(len(gt_order)):
-#         index = story.index(gt_order[i])
-#         story[index] = i
-        
-#     gt_order = list(range(len(gt_order)))
-#     total = len(story) * (len(story)-1) // 2
-#     for idx1 in range(len(story)):
-#         for idx2 in range(idx1+1, len(story)):
-#             if story[idx1] < story[idx2]:
-#                 correct += 1
-#     return correct/total
-
 def pairwise_acc(story, gt_order):
     correct = 0
     try:

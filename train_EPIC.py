@@ -13,8 +13,8 @@ from model.network import FrameReorderNet
 from model.trainer import Trainer
 # from dataset.static_dataset import StaticTransformDataset
 # from dataset.vos_dataset import VOSDataset
-from dataset.EPIC_dataset import EPICDataset
-from dataset.EPIC_testdataset import EPICtestDataset
+from dataset.EPIC_dataset import EPICDataset, EPICClipDataset
+from dataset.EPIC_testdataset import EPICtestDataset, EPICCliptestDataset
 from argparse import ArgumentParser
 from util.exp_handler import *
 import pathlib
@@ -69,7 +69,7 @@ def get_EPIC_parser():
     parser.add_argument('--repr_type', type=str, choices=['Clip', 'ImageNet', 'Segmentation', 'Action'])
     parser.add_argument('--use_position_embedding', default=1, type=int, choices=[0,1])
     parser.add_argument('--openword_test', default=0, type=int, choices=[0,1])
-    
+    parser.add_argument('--use_clip_feature', default=0, type=int, choices=[0,1])
     args = parser.parse_args()
     return {**vars(args), **{'amp': not args.no_amp}}
 
@@ -143,13 +143,19 @@ def construct_loader(dataset):
                             worker_init_fn=worker_init_fn, drop_last=True)
     return train_sampler, train_loader
 
-train_dataset = EPICDataset(data_root=config['epic_root'], yaml_root=config['yaml_root'], openword_test=config['openword_test'], 
+if not config['use_clip_feature']:
+    train_dataset = EPICDataset(data_root=config['epic_root'], yaml_root=config['yaml_root'], openword_test=config['openword_test'], 
                         num_frames=config['num_frames'], repr_type=config['repr_type'])
-
-train_sampler, train_loader = construct_loader(train_dataset)
-val_dataset = EPICtestDataset(data_root='./val_data', yaml_root='./val_data/EPIC100_state_positive_val.yaml', valset_yaml_root='./val_data/reordering_val.yaml', 
+    val_dataset = EPICtestDataset(data_root='./val_data', yaml_root='./val_data/EPIC100_state_positive_val.yaml', valset_yaml_root='./val_data/reordering_val.yaml', 
+                        num_frames=5, repr_type=config['repr_type'])
+else:
+    print(f'use video clip feature!!!')
+    train_dataset = EPICClipDataset(data_root=config['epic_root'], yaml_root=config['yaml_root'], openword_test=config['openword_test'], 
+                        num_frames=config['num_frames'], repr_type=config['repr_type'])
+    val_dataset = EPICCliptestDataset(data_root='./val_data', yaml_root='./val_data/EPIC100_state_positive_val.yaml', valset_yaml_root='./val_data/reordering_val.yaml', 
                         num_frames=5, repr_type=config['repr_type'])
 
+train_sampler, train_loader = construct_loader(train_dataset)
 val_loader = DataLoader(dataset=val_dataset, batch_size=7, shuffle=False, num_workers=4, pin_memory=True)
 
 # Load pertrained model if needed
