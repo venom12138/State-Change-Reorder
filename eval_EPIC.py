@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import numpy as np
 from PIL import Image
-from dataset.EPIC_testdataset import EPICtestDataset
+from dataset.EPIC_testdataset import EPICtestDataset, EPICCliptestDataset
 from dataset.EPIC_dataset import EPICDataset
 from model.network import FrameReorderNet
 import scipy
@@ -124,7 +124,7 @@ parser.add_argument('--repr_type', type=str, choices=['Clip', 'ImageNet', 'Segme
 parser.add_argument('--freeze', default=0, type=int, choices=[0,1])
 parser.add_argument('--use_position_embedding', default=1, type=int, choices=[0,1])
 parser.add_argument('--openword_test', default=0, type=int, choices=[0,1])
-    
+parser.add_argument('--use_clip_feature', default=0, type=int, choices=[0,1])
 args = parser.parse_args()
 
 config = vars(args)
@@ -141,9 +141,12 @@ Data preparation
 out_path = args.output
 
 print(out_path)
-
-val_dataset = EPICtestDataset(data_root=args.EPIC_path, yaml_root=args.yaml_path, valset_yaml_root=args.valset_yaml_path, 
-                            num_frames=5, repr_type=args.repr_type)
+if not args.use_clip_feature:
+    val_dataset = EPICtestDataset(data_root=args.EPIC_path, yaml_root=args.yaml_path, valset_yaml_root=args.valset_yaml_path, 
+                                num_frames=5, repr_type=args.repr_type)
+else:
+    val_dataset = EPICCliptestDataset(data_root=args.EPIC_path, yaml_root=args.yaml_path, valset_yaml_root=args.valset_yaml_path, 
+                                num_frames=5, repr_type=args.repr_type)
 torch.autograd.set_grad_enabled(False)
 
 val_loader = DataLoader(dataset=val_dataset, batch_size=7, shuffle=False, num_workers=4, pin_memory=True)
